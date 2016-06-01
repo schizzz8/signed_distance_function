@@ -66,11 +66,6 @@ public:
         return true;
     }
 
-    inline const Eigen::Vector3i idx() const {return _idx;}
-    inline const Eigen::Vector3f center() const {return _center;}
-    inline const std::vector<Eigen::Vector3f> points() const {return _points;}
-    inline const float distance() const {return _distance;}
-
     Eigen::Vector3i _idx;
     Eigen::Vector3f _center;
     std::vector<Eigen::Vector3f> _points;
@@ -87,7 +82,7 @@ struct QEntry{
     }
 
     inline bool operator < (const QEntry& e) const {
-        return e._distance > _distance ;
+        return e._distance < _distance ;
     }
 
     float _distance;

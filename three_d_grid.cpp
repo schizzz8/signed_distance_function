@@ -89,7 +89,6 @@ double BaseGrid::computeCloudResolution() {
         {
             continue;
         }
-        //Considering the second neighbor since the first is the point itself.
         tree.nearestKSearch (i, 2, indices, sqr_distances);
         res += sqrt (sqr_distances[1]);
         ++n_points;
@@ -145,14 +144,14 @@ int BaseGrid::isDirectoryEmpty(const char *dirname)
     int n = 0;
     struct dirent *d;
     DIR *dir = opendir(dirname);
-    if (dir == NULL) //Not a directory or doesn't exist
+    if (dir == NULL)
         return 1;
     while ((d = readdir(dir)) != NULL) {
         if(++n > 2)
             break;
     }
     closedir(dir);
-    if (n <= 2) //Directory Empty
+    if (n <= 2)
         return 1;
     else
         return 0;
@@ -160,7 +159,7 @@ int BaseGrid::isDirectoryEmpty(const char *dirname)
 
 DenseGrid::DenseGrid(string filename, int prec): BaseGrid(filename,prec) {
 
-    cout << BOLD(FBLU("Building the 3D Grid:\n"));
+    cout << BOLD(FBLU("Building the 3D Grid (Dense):\n"));
     cout << "\t>> Delta: " << _resolution << "m\n";
     cout << "\t>> Grid dimensions: (" << _size.x() << "," << _size.y() << "," << _size.z() << ")\t total: " << _num_cells << "\n";
     cout << "\t>> Origin: (" << _origin.x() << "," << _origin.y() << "," << _origin.z() << ")\n";
@@ -388,7 +387,7 @@ AdaptiveGrid::AdaptiveGrid(string filename, int prec) : BaseGrid(filename,prec) 
         }
     }
 
-    cout << BOLD(FBLU("Building the 3D Grid:\n"));
+    cout << BOLD(FBLU("Building the 3D Grid (Sparse):\n"));
     cout << "\t>> Delta: " << _resolution << "m\n";
     cout << "\t>> Grid dimensions: (" << _size.x() << "," << _size.y() << "," << _size.z() << ")\t total: " << _num_cells << "\n";
     cout << "\t>> Origin: (" << _origin.x() << "," << _origin.y() << "," << _origin.z() << ")\n";
@@ -441,8 +440,17 @@ void AdaptiveGrid::computeDistanceMap(float maxDistance) {
         q.push(cell);
     }
 
-    Cell* neighbors[26];
+//    int loop = 3;
+//    Cell* last = 0;
+//    CellQueue dummy(q);
+//    while (!dummy.empty()) {
+//        last = dummy.top();
+//        dummy.pop();
+//    }
+
     bool stop = false;
+
+    Cell* neighbors[26];
 
     while(stop == false) {
         Cell* current = q.top();
@@ -463,9 +471,19 @@ void AdaptiveGrid::computeDistanceMap(float maxDistance) {
                 child->_distance = d;
                 q.push(child);
             }
-            if (d > 100)
+            if(d > 5)
                 stop = true;
+
         }
+//        if(*last == *current) {
+//            dummy = q;
+//            while (!dummy.empty()) {
+//                last = dummy.top();
+//                dummy.pop();
+//            }
+//            loop--;
+//        }
+
     }
     std::clock_t t1 = clock();
     double elapsed_time1 = double(t1 - t0)/CLOCKS_PER_SEC;
@@ -486,8 +504,6 @@ void AdaptiveGrid::writeDataToFile() {
 #else
     imageData->AllocateScalars(VTK_FLOAT, 1);
 #endif
-
-    cerr << _cells.size() << endl;
 
     vtkSmartPointer<vtkFloatArray> dist = vtkSmartPointer<vtkFloatArray>::New();
     dist->SetName("distance_function");
