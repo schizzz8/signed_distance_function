@@ -10,11 +10,15 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <utility>
-#include <set>
+#include <map>
+#include <functional>
+#include <string>
+#include <unordered_map>
 
 #include <Eigen/Core>
+#include <Eigen/Dense>
 
-#include <string>
+
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/vtk_io.h>
 #include <pcl/point_types.h>
@@ -37,8 +41,7 @@
 #include "colors.h"
 
 
-typedef pcl::PointXYZ PointType;
-
+typedef pcl::PointNormal PointType;
 
 class Cell {
 public:
@@ -66,13 +69,17 @@ public:
         return true;
     }
 
+    inline void setCenter(Eigen::Vector3f origin, float resolution) {
+        _center = origin + _idx.cast<float>()*resolution + Eigen::Vector3f(resolution/2,resolution/2,resolution/2);
+    }
+
     Eigen::Vector3i _idx;
     Eigen::Vector3f _center;
-    std::vector<Eigen::Vector3f> _points;
+    std::vector<size_t> _points;
     Cell* _parent;
     size_t _closest_point;
     float _distance;
-    int _tag;
+    float _tag;
 };
 
 struct QEntry{
@@ -112,7 +119,16 @@ public:
     int toInt(Eigen::Vector3i idx);
     void toIJK(int in, Eigen::Vector3i& idx);
 
-    virtual bool hasCell(const Eigen::Vector3i& _idx){ return 0;}
+    inline float euclideanDistance(Eigen::Vector3f a, PointType b){return sqrtf(pow(a.x()-b.x,2)+pow(a.y()-b.y,2)+pow(a.z()-b.z,2));}
+    inline float tagCell(Eigen::Vector3f a, PointType b) {
+        Eigen::Vector3f diff (a.x()-b.x,a.y()-b.y,a.z()-b.z);
+        diff /= sqrtf(diff.x()*diff.x() + diff.y()*diff.y() + diff.z()*diff.z());
+        float tag = diff.x()*b.normal_x + diff.y()*b.normal_y + diff.z()*b.normal_z;
+        return tag;
+    }
+    inline int sgn(float in){(in < 0 ) ? -1 : 1;}
+
+    virtual bool hasCell(const Eigen::Vector3i& idx){ return 0;}
     virtual int findNeighbors(Cell** neighbors, Cell* c){ return 0;}
     virtual void computeDistanceMap(float maxDistance=std::numeric_limits<float>::max()){}
 
@@ -139,7 +155,7 @@ public:
     ~DenseGrid();
     void computeDistanceMap(float maxDistance=std::numeric_limits<float>::max());
 
-    bool hasCell(const Eigen::Vector3i& idx_);
+    bool hasCell(const Eigen::Vector3i& idx);
     int findNeighbors(Cell** neighbors, Cell* c);
 
     void writeDataToFile();
@@ -151,15 +167,30 @@ protected:
     int*** _imap;
 };
 
+template<typename T>
+struct matrix_hash : std::unary_function<T, size_t> {
+  std::size_t operator()(T const& matrix) const {
+    size_t seed = 0;
+    for (size_t i = 0; i < matrix.size(); ++i) {
+      auto elem = *(matrix.data() + i);
+      seed ^= std::hash<typename T::Scalar>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+  }
+};
+
+typedef std::unordered_map<Eigen::Vector3i,Cell*,matrix_hash<Eigen::Vector3i> > Vector3iCellPtrMap;
+
 class AdaptiveGrid : public BaseGrid {
 public:
     AdaptiveGrid (std::string filename="input.pcd", int prec = 5);
     void computeDistanceMap(float maxDistance=std::numeric_limits<float>::max());
 
-    int findNeighbors(Cell **neighbors, Cell *c);
-
     void writeDataToFile();
 
 protected:
-    std::set<Cell> _cells;
+    Vector3iCellPtrMap _cells;
+
+    bool hasCell(const Eigen::Vector3i& idx);
+    int findNeighbors(Cell **neighbors, Cell *c);
 };

@@ -6,7 +6,7 @@
 using namespace std;
 
 string filename = "input.pcd";
-int prec = 5;
+int prec = 10;
 string method = "sparse";
 
 void parseCommandLine(int argc, char* argv[]);
